@@ -1,0 +1,30 @@
+node
+{
+    def buildnumber = BUILD_NUMBER
+    stage("git clone"){
+        git credentialsId: '6177e412-55f4-4a6b-9684-29bc139bf698', url: 'https://github.com/pss-ec-application/maven-web-application.git'
+    }
+    stage("maven build"){
+        def mavenHome= tool name: "Maven",type: "maven"
+     sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage("build docker image"){
+        sh "docker build -t dockerdreamz25/maven-web-app:${buildnumber} ."
+    }
+    stage("docker login and push"){
+        withCredentials([string(credentialsId: 'DockerHubPwd', variable: 'DockerHubPwd')]) {
+        sh "docker login -u dockerdreamz25 -p ${DockerHubPwd}"
+   }
+    sh "docker push dockerdreamz25/maven-web-app:${buildnumber}"
+    }
+    stage("create container and deploy application as container in deployment server"){
+        sshagent(['docker_dev_SSH_server']) {
+sh "ssh -o StrictHostKeyChecking=no ubuntu@52.66.255.28 docker rm -f mavencontainer || true"
+    
+            sh "ssh -o StrictHostKeyChecking=no ubuntu@52.66.255.28 docker run -d -p 8080:8080 --name mavencontainer dockerdreamz25/maven-web-app:${buildnumber}  "
+            
+        }
+ }
+    
+}
+ 
